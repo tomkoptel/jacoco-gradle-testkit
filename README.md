@@ -1,0 +1,1 @@
+An attempt to replicate the setup of [Jacoco & Gradle Test Kit with Java](https://discuss.gradle.org/t/jacoco-gradle-test-kit-with-java/36603/7) thread.
