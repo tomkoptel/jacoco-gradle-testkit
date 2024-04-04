@@ -53,12 +53,10 @@ tasks.test {
 
 val jacocoAnt by configurations.existing
 tasks.pluginUnderTestMetadata {
-    inputs.property("jacocoAntPath", objects.fileCollection().from(jacocoAnt))
+    inputs.files(jacocoAnt).withPropertyName("jacocoAntPath").withNormalizer(ClasspathNormalizer::class.java)
     actions.clear()
     doLast {
-        val collection = inputs.properties["jacocoAntPath"] as FileCollection
-        val classpath = collection.asPath
-
+        val classpath = inputs.files.asPath
         val instrumentedPluginClasspath = temporaryDir.resolve("instrumentedPluginClasspath")
         instrumentedPluginClasspath.deleteRecursively()
         ant.withGroovyBuilder {
@@ -119,4 +117,3 @@ class LazyString(private val source: Lazy<String>) : Serializable {
 
     override fun toString() = source.value
 }
-
