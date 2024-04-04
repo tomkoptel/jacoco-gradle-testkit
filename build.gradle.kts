@@ -1,10 +1,9 @@
 import org.gradle.plugin.devel.tasks.PluginUnderTestMetadata.IMPLEMENTATION_CLASSPATH_PROP_KEY
-import org.gradle.plugin.devel.tasks.PluginUnderTestMetadata.METADATA_FILE_NAME
 import org.jetbrains.kotlin.konan.file.use
 import java.io.Serializable
 import java.nio.channels.FileChannel
 import java.nio.file.StandardOpenOption
-import java.util.Properties
+import java.util.*
 
 plugins {
     `kotlin-dsl`
@@ -58,13 +57,15 @@ tasks.pluginUnderTestMetadata {
     actions.clear()
     doLast {
         val collection = inputs.properties["jacocoAntPath"] as FileCollection
+        val classpath = collection.asPath
+
         val instrumentedPluginClasspath = temporaryDir.resolve("instrumentedPluginClasspath")
         instrumentedPluginClasspath.deleteRecursively()
         ant.withGroovyBuilder {
             "taskdef"(
                 "name" to "instrument",
                 "classname" to "org.jacoco.ant.InstrumentTask",
-                "classpath" to collection.asPath
+                "classpath" to classpath
             )
             "instrument"("destdir" to instrumentedPluginClasspath) {
                 pluginClasspath.asFileTree.visit {
@@ -78,12 +79,15 @@ tasks.pluginUnderTestMetadata {
 
         val properties = Properties()
         if (!pluginClasspath.isEmpty) {
+            val originalClasspath = pluginClasspath.joinToString(File.pathSeparator) {
+                it.absoluteFile.invariantSeparatorsPath
+            }
             properties.setProperty(
                 IMPLEMENTATION_CLASSPATH_PROP_KEY,
-                instrumentedPluginClasspath.absoluteFile.invariantSeparatorsPath
+                originalClasspath + File.pathSeparator + instrumentedPluginClasspath.absoluteFile.invariantSeparatorsPath
             )
         }
-        outputDirectory.file(METADATA_FILE_NAME).get().asFile.outputStream().use {
+        outputDirectory.file(PluginUnderTestMetadata.METADATA_FILE_NAME).get().asFile.outputStream().use {
             properties.store(it, null)
         }
     }
