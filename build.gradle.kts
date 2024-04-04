@@ -1,8 +1,10 @@
+import org.gradle.plugin.devel.tasks.PluginUnderTestMetadata.IMPLEMENTATION_CLASSPATH_PROP_KEY
+import org.gradle.plugin.devel.tasks.PluginUnderTestMetadata.METADATA_FILE_NAME
+import org.jetbrains.kotlin.konan.file.use
 import java.io.Serializable
 import java.nio.channels.FileChannel
-import java.nio.file.OpenOption
 import java.nio.file.StandardOpenOption
-import java.nio.file.attribute.FileAttribute
+import java.util.Properties
 
 plugins {
     `kotlin-dsl`
@@ -24,7 +26,6 @@ dependencies {
 
 tasks.test {
     finalizedBy(tasks.jacocoTestReport)
-    finalizedBy(tasks.jacocoTestReport)
     val testRuns = layout.buildDirectory.dir("testRuns")
     systemProperty("testEnv.workDir", LazyString(testRuns.map { it.asFile.apply { mkdirs() }.absolutePath }))
 
@@ -43,8 +44,40 @@ tasks.test {
     }
 }
 
-tasks.jacocoTestReport {
-    executionData(tasks.test.map { test -> test.the<JacocoTaskExtension>().destinationFile })
+jacoco {
+    toolVersion = "0.8.12"
+}
+
+tasks.test {
+    the<JacocoTaskExtension>().excludes = listOf("*")
+}
+
+val jacocoAnt by configurations.existing
+tasks.pluginUnderTestMetadata {
+    actions.clear()
+    doLast {
+        val instrumentedPluginClasspath = temporaryDir.resolve("instrumentedPluginClasspath")
+        instrumentedPluginClasspath.deleteRecursively()
+        ant.withGroovyBuilder {
+            "taskdef"("name" to "instrument",
+                "classname" to "org.jacoco.ant.InstrumentTask",
+                "classpath" to jacocoAnt.get().asPath)
+            "instrument"("destdir" to instrumentedPluginClasspath) {
+                pluginClasspath.asFileTree.addToAntBuilder(ant, "resources")
+            }
+        }
+
+        val properties = Properties();
+        if (!pluginClasspath.isEmpty) {
+            properties.setProperty(
+                IMPLEMENTATION_CLASSPATH_PROP_KEY,
+                instrumentedPluginClasspath.absoluteFile.invariantSeparatorsPath
+            )
+        }
+        outputDirectory.file(METADATA_FILE_NAME).get().asFile.outputStream().use {
+            properties.store(it, null)
+        }
+    }
 }
 
 tasks.jacocoTestReport {
