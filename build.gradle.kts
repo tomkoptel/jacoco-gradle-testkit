@@ -54,20 +54,29 @@ tasks.test {
 
 val jacocoAnt by configurations.existing
 tasks.pluginUnderTestMetadata {
+    inputs.property("jacocoAntPath", objects.fileCollection().from(jacocoAnt))
     actions.clear()
     doLast {
+        val collection = inputs.properties["jacocoAntPath"] as FileCollection
         val instrumentedPluginClasspath = temporaryDir.resolve("instrumentedPluginClasspath")
         instrumentedPluginClasspath.deleteRecursively()
         ant.withGroovyBuilder {
-            "taskdef"("name" to "instrument",
+            "taskdef"(
+                "name" to "instrument",
                 "classname" to "org.jacoco.ant.InstrumentTask",
-                "classpath" to jacocoAnt.get().asPath)
+                "classpath" to collection.asPath
+            )
             "instrument"("destdir" to instrumentedPluginClasspath) {
-                pluginClasspath.asFileTree.addToAntBuilder(ant, "resources")
+                pluginClasspath.asFileTree.visit {
+                    "gradleFileResource"(
+                        "file" to file.absolutePath.replace("$", "$$"),
+                        "name" to relativePath.pathString.replace("$", "$$")
+                    )
+                }
             }
         }
 
-        val properties = Properties();
+        val properties = Properties()
         if (!pluginClasspath.isEmpty) {
             properties.setProperty(
                 IMPLEMENTATION_CLASSPATH_PROP_KEY,
