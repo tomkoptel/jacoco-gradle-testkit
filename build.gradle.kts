@@ -84,7 +84,7 @@ tasks.pluginUnderTestMetadata {
             }
             properties.setProperty(
                 IMPLEMENTATION_CLASSPATH_PROP_KEY,
-                originalClasspath + File.pathSeparator + instrumentedPluginClasspath.absoluteFile.invariantSeparatorsPath
+                instrumentedPluginClasspath.absoluteFile.invariantSeparatorsPath + File.pathSeparator + originalClasspath
             )
         }
         outputDirectory.file(PluginUnderTestMetadata.METADATA_FILE_NAME).get().asFile.outputStream().use {
