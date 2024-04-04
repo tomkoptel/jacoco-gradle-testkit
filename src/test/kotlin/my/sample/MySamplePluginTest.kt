@@ -16,7 +16,7 @@ class MySamplePluginTest {
     }
 
     private val jacocoAgentJar: String get() = System.getProperty("jacocoAgentJar")!!
-    private val jacocoDestfile: String get() = System.getProperty("jacocoDestfile")!!
+    private val jacocoDestfile: String get() = System.getProperty("jacocoDestfile")!!.replace("""\""", """\\""")
 
     @Test
     fun `task is executed`() {
@@ -50,11 +50,17 @@ class MySamplePluginTest {
         )
         testProjectDir.newFile("gradle.properties").writeText(
             """
-                org.gradle.jvmargs="-javaagent:\$jacocoAgentJar=destfile=\$jacocoDestfile,append=true,dumponexit=false,jmx=true"
+                systemProp.jacoco-agent.destfile=$jacocoDestfile
+                systemProp.jacoco-agent.append=true
+                systemProp.jacoco-agent.dumponexit=false
+                systemProp.jacoco-agent.jmx=true
             """.trimIndent()
         )
         GradleRunner.create()
             .withPluginClasspath()
+            .run {
+                withPluginClasspath(pluginClasspath + File(jacocoAgentJar))
+            }
             .withProjectDir(testProjectDir.root)
             .withArguments("mySampleTask")
             .build()
