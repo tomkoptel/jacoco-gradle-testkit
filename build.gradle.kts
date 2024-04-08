@@ -54,47 +54,53 @@ tasks.test {
     the<JacocoTaskExtension>().excludes = listOf("*")
 }
 
-val jacocoAnt by configurations.existing
-tasks.pluginUnderTestMetadata {
-    inputs.files(jacocoAnt).withPropertyName("jacocoAntPath").withNormalizer(ClasspathNormalizer::class.java)
-    actions.clear()
-    doLast {
-        val jacocoAntPath = inputs.files.asPath
-        val instrumentedPluginClasspath = temporaryDir.resolve("instrumentedPluginClasspath")
-        instrumentedPluginClasspath.deleteRecursively()
-        ant.withGroovyBuilder {
-            "taskdef"(
-                "name" to "instrument",
-                "classname" to "org.jacoco.ant.InstrumentTask",
-                "classpath" to jacocoAntPath
-            )
-            "instrument"("destdir" to instrumentedPluginClasspath) {
-                pluginClasspath.asFileTree.visit {
-                    "gradleFileResource"(
-                        "file" to file.absolutePath.replace("$", "$$"),
-                        "name" to relativePath.pathString.replace("$", "$$")
-                    )
+val disableFix: String? by project
+val shouldDisableFix = disableFix?.toBoolean() ?: false
+println("disableFix: $shouldDisableFix")
+
+if (!shouldDisableFix) {
+    val jacocoAnt by configurations.existing
+    tasks.pluginUnderTestMetadata {
+        inputs.files(jacocoAnt).withPropertyName("jacocoAntPath").withNormalizer(ClasspathNormalizer::class.java)
+        actions.clear()
+        doLast {
+            val jacocoAntPath = inputs.files.asPath
+            val instrumentedPluginClasspath = temporaryDir.resolve("instrumentedPluginClasspath")
+            instrumentedPluginClasspath.deleteRecursively()
+            ant.withGroovyBuilder {
+                "taskdef"(
+                    "name" to "instrument",
+                    "classname" to "org.jacoco.ant.InstrumentTask",
+                    "classpath" to jacocoAntPath
+                )
+                "instrument"("destdir" to instrumentedPluginClasspath) {
+                    pluginClasspath.asFileTree.visit {
+                        "gradleFileResource"(
+                            "file" to file.absolutePath.replace("$", "$$"),
+                            "name" to relativePath.pathString.replace("$", "$$")
+                        )
+                    }
                 }
             }
-        }
 
-        val properties = Properties()
-        if (!pluginClasspath.isEmpty) {
-            properties.setProperty(
-                IMPLEMENTATION_CLASSPATH_PROP_KEY,
-                listOf(
-                    instrumentedPluginClasspath
-                        .absoluteFile
-                        .invariantSeparatorsPath,
-                    *instrumentedPluginClasspath
-                        .listFiles { _, name -> name.endsWith(".jar") }!!
-                        .map { it.absoluteFile.invariantSeparatorsPath }
-                        .toTypedArray()
-                ).joinToString(File.pathSeparator)
-            )
-        }
-        outputDirectory.file(PluginUnderTestMetadata.METADATA_FILE_NAME).get().asFile.outputStream().use {
-            properties.store(it, null)
+            val properties = Properties()
+            if (!pluginClasspath.isEmpty) {
+                properties.setProperty(
+                    IMPLEMENTATION_CLASSPATH_PROP_KEY,
+                    listOf(
+                        instrumentedPluginClasspath
+                            .absoluteFile
+                            .invariantSeparatorsPath,
+                        *instrumentedPluginClasspath
+                            .listFiles { _, name -> name.endsWith(".jar") }!!
+                            .map { it.absoluteFile.invariantSeparatorsPath }
+                            .toTypedArray()
+                    ).joinToString(File.pathSeparator)
+                )
+            }
+            outputDirectory.file(PluginUnderTestMetadata.METADATA_FILE_NAME).get().asFile.outputStream().use {
+                properties.store(it, null)
+            }
         }
     }
 }
@@ -106,6 +112,18 @@ tasks.jacocoTestReport {
     }
     dependsOn(tasks.test)
 }
+
+tasks.jacocoTestCoverageVerification {
+    violationRules {
+        rule {
+            limit {
+                minimum = "0.8".toBigDecimal()
+            }
+        }
+    }
+    dependsOn(tasks.jacocoTestReport)
+}
+
 
 gradlePlugin {
     plugins {
