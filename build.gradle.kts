@@ -25,6 +25,8 @@ dependencies {
 }
 
 tasks.test {
+    val jacocoTaskExtension = the<JacocoTaskExtension>()
+
     finalizedBy(tasks.jacocoTestReport)
     val testRuns = layout.buildDirectory.dir("testRuns")
     systemProperty("testEnv.workDir", LazyString(testRuns.map { it.asFile.apply { mkdirs() }.absolutePath }))
@@ -33,11 +35,11 @@ tasks.test {
 
     // Set system properties for the test task
     systemProperty("jacocoAgentJar", jacocoAgentJar)
-    systemProperty("jacocoDestfile", the<JacocoTaskExtension>().destinationFile!!.absolutePath)
+    systemProperty("jacocoDestfile", jacocoTaskExtension.destinationFile!!.absolutePath)
 
     // Add doLast action for read lock
     doLast {
-        val jacocoDestfile = the<JacocoTaskExtension>().destinationFile!!
+        val jacocoDestfile = jacocoTaskExtension.destinationFile!!
         FileChannel.open(jacocoDestfile.toPath(), StandardOpenOption.READ).use {
             it.lock(0, Long.MAX_VALUE, true).release()
         }
@@ -55,9 +57,9 @@ tasks.test {
 val jacocoAnt by configurations.existing
 tasks.pluginUnderTestMetadata {
     inputs.files(jacocoAnt).withPropertyName("jacocoAntPath").withNormalizer(ClasspathNormalizer::class.java)
-    val jacocoAntPath = jacocoAnt.get().asPath
     actions.clear()
     doLast {
+        val jacocoAntPath = inputs.files.asPath
         val instrumentedPluginClasspath = temporaryDir.resolve("instrumentedPluginClasspath")
         instrumentedPluginClasspath.deleteRecursively()
         ant.withGroovyBuilder {
