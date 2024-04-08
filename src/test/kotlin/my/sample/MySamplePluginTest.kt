@@ -62,7 +62,7 @@ class MySamplePluginTest {
                 withPluginClasspath(pluginClasspath + File(jacocoAgentJar))
             }
             .withProjectDir(testProjectDir.root)
-            .withArguments("mySampleTask")
+            .withArguments("mySampleTask", "-d")
             .build()
         val output = SimpleDateFormat("yyyy-MM-dd").format(Date())
         val outputContents = testProjectDir.root.resolve("build/mySampleTaskOutput.txt").readText()

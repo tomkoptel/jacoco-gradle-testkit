@@ -20,6 +20,7 @@ dependencies {
     compileOnly(gradleApi())
     testImplementation("junit:junit:4.13.2")
     testImplementation(gradleTestKit())
+    implementation("commons-io:commons-io:+")
     jacocoAgentJar("org.jacoco:org.jacoco.agent:0.8.12:runtime")
 }
 
@@ -54,16 +55,16 @@ tasks.test {
 val jacocoAnt by configurations.existing
 tasks.pluginUnderTestMetadata {
     inputs.files(jacocoAnt).withPropertyName("jacocoAntPath").withNormalizer(ClasspathNormalizer::class.java)
+    val jacocoAntPath = jacocoAnt.get().asPath
     actions.clear()
     doLast {
-        val classpath = inputs.files.asPath
         val instrumentedPluginClasspath = temporaryDir.resolve("instrumentedPluginClasspath")
         instrumentedPluginClasspath.deleteRecursively()
         ant.withGroovyBuilder {
             "taskdef"(
                 "name" to "instrument",
                 "classname" to "org.jacoco.ant.InstrumentTask",
-                "classpath" to classpath
+                "classpath" to jacocoAntPath
             )
             "instrument"("destdir" to instrumentedPluginClasspath) {
                 pluginClasspath.asFileTree.visit {
@@ -77,12 +78,17 @@ tasks.pluginUnderTestMetadata {
 
         val properties = Properties()
         if (!pluginClasspath.isEmpty) {
-            val originalClasspath = pluginClasspath.joinToString(File.pathSeparator) {
-                it.absoluteFile.invariantSeparatorsPath
-            }
             properties.setProperty(
                 IMPLEMENTATION_CLASSPATH_PROP_KEY,
-                instrumentedPluginClasspath.absoluteFile.invariantSeparatorsPath + File.pathSeparator + originalClasspath
+                listOf(
+                    instrumentedPluginClasspath
+                        .absoluteFile
+                        .invariantSeparatorsPath,
+                    *instrumentedPluginClasspath
+                        .listFiles { _, name -> name.endsWith(".jar") }!!
+                        .map { it.absoluteFile.invariantSeparatorsPath }
+                        .toTypedArray()
+                ).joinToString(File.pathSeparator)
             )
         }
         outputDirectory.file(PluginUnderTestMetadata.METADATA_FILE_NAME).get().asFile.outputStream().use {

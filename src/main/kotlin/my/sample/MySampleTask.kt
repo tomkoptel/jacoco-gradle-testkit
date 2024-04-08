@@ -1,5 +1,6 @@
 package my.sample
 
+import org.apache.commons.io.IOUtil
 import org.gradle.api.DefaultTask
 import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.provider.Property
@@ -16,6 +17,7 @@ abstract class MySampleTask : DefaultTask() {
 
     @TaskAction
     fun run() {
+        println(IOUtil::class)
         output.get().asFile.writeText(input.get())
     }
 }
